@@ -11,26 +11,21 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - name: Conventional Changelog Action
-        id: changelog
-        uses: TriPSs/conventional-changelog-action@v5
+      - name: Build Changelog
+        id: github_release
+        uses: mikepenz/release-changelog-builder-action@v4
         with:
-          skip-version-file: "true"
-          skip-commit: "true"
-          skip-git-pull: "true"
-          github-token: ${{ secrets.github_token }}
-          output-file: "false"
-
-      - name: Create Release
-        uses: actions/create-release@v1
-        if: ${{ steps.changelog.outputs.skipped == 'false' }}
+          commitMode: "true"
         env:
-          GITHUB_TOKEN: ${{ secrets.github_token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.changelog.outputs.tag }}
-          release_name: ${{ steps.changelog.outputs.tag }}
-          body: ${{ steps.changelog.outputs.clean_changelog }}     
+          body: ${{steps.github_release.outputs.changelog}}
+          # note you'll typically need to create a personal access token
+          # with permissions to create releases in the other repo
+          token: ${{ secrets.GITHUB_TOKEN }}
       
   build:
     strategy:
@@ -51,11 +46,11 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Install cross-compilation tools
+      - name: Install android cross-compilation tools
         uses: taiki-e/setup-cross-toolchain-action@v1
+        if: contains(matrix.target, 'android')
         with:
-          target: ${{ matrix.target }}
-        if: startsWith(matrix.os, 'ubuntu')
+          target: ${{ matrix.target }}@24
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
           # (required) Comma-separated list of binary names (non-extension portion of filename) to build and upload.
