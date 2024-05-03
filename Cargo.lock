@@ -409,6 +409,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "funny-injector"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "apk",
+ "clap",
+ "console",
+ "human_bytes",
+ "indicatif",
+ "inquire",
+ "object-rewrite",
+ "thiserror",
+ "ureq",
+ "zip 1.1.3",
+]
+
+[[package]]
 name = "funty"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -515,23 +532,6 @@ dependencies = [
  "number_prefix",
  "portable-atomic",
  "unicode-width",
-]
-
-[[package]]
-name = "injector"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "apk",
- "clap",
- "console",
- "human_bytes",
- "indicatif",
- "inquire",
- "object-rewrite",
- "thiserror",
- "ureq",
- "zip 1.1.3",
 ]
 
 [[package]]
