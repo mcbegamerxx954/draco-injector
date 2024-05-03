@@ -92,6 +92,15 @@ fn rewrite_zip(zip_file: &File, output: &Path, opts: &Options) -> Result<()> {
             outzip.write_all(&axml)?;
             continue;
         }
+        // Boo hoo alignment & compression
+        if file.name() == "resources.arsc" {
+            let options = zip::write::FileOptions::<ExtendedFileOptions>::default()
+                .compression_method(zip::CompressionMethod::Stored)
+                .with_alignment(4);
+            outzip.start_file(file.name(), options)?;
+            std::io::copy(&mut file, &mut outzip)?;
+            continue;
+        }
         let libarch = match LibraryArch::from_str(file.name()) {
             Some(lib) => lib,
             None => {
