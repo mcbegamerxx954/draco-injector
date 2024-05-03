@@ -1,5 +1,5 @@
 [package]
-name = "funny-injector"
+name = "injector"
 version = "0.1.0"
 edition = "2021"
 
