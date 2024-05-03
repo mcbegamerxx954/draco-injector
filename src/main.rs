@@ -1,6 +1,7 @@
 use std::{
     fs::{self, File},
     io::{Cursor, Read, Write},
+    mem,
     path::Path,
 };
 
@@ -141,68 +142,78 @@ fn edit_manifest(manifest: &[u8], name: &str, pkg_name: Option<&str>) -> Result<
     let Chunk::StringPool(strings, _) = string_pool else {
         anyhow::bail!("Annoying....");
     };
-    let mut old_pkg = None;
-    // Change package name
-    let manifest_attrs = chunks
-        .iter_mut()
-        .find_map(|c| parse_element(c, "manifest", strings))
-        .with_context(|| "Cant find manifest root element")?;
-    if pkg_name.is_some() {
-        if let Some(value) = get_attribute_value(manifest_attrs, "package", strings) {
-            assert!(value.data_type == ResValueType::String as u8);
-            old_pkg = Some(strings[value.data as usize].clone());
-            strings[value.data as usize] = pkg_name.unwrap().to_owned();
-        };
-    }
-    // The reason this is like this is that
-    // Mojang devs decided to put app name in resources.arsc
-    // Trying to edit it made me wanna cry
-    let application_attrs = chunks
-        .iter_mut()
-        .find_map(|c| parse_element(c, "application", strings))
-        .with_context(|| "Cant find application element")?;
 
-    if let Some(attr) = application_attrs
-        .iter_mut()
-        .find(|a| attr_has_name(a.name, "label", strings))
-    {
-        let value = &mut attr.typed_value;
-        let attr_type = ResValueType::from_u8(value.data_type)
-            .with_context(|| format!("Type of label value is unknown: {}", value.data_type))?;
-        match attr_type {
-            ResValueType::String => strings[value.data as usize] = name.to_owned(),
-            // In this case we overwrite it so that its a direct string, rid solving is pain
-            _ => {
-                let new_rvalue = ResValue {
-                    size: 8,
-                    res0: 0,
-                    data_type: ResValueType::String as u8,
-                    data: strings.len() as u32,
-                };
-                *value = new_rvalue;
-                attr.raw_value = strings.len() as i32;
-                strings.push(name.to_owned());
+    // Change package name
+    if let Some(pkgname) = pkg_name {
+        let old_pkgname =
+            edit_attr_in_element(chunks, "manifest", "package", pkgname.to_owned(), strings)?
+                .with_context(|| "There is no package name in manifest.")?;
+
+        // Get rid of conflicts
+        let providers: Vec<&mut Vec<ResXmlAttribute>> = chunks
+            .iter_mut()
+            .filter_map(|c| parse_element(c, "provider", strings))
+            .collect();
+
+        for provider_attrs in providers {
+            if let Some(value) = get_attribute_value(&provider_attrs, "authorities", strings) {
+                let string = &mut strings[value.data as usize];
+                if let Some(suffix) = string.strip_prefix(&old_pkgname) {
+                    *string = pkg_name.unwrap().to_owned() + suffix;
+                }
             }
         }
     }
-    // Get rid of conflicts
-    let providers: Vec<&mut Vec<ResXmlAttribute>> = chunks
-        .iter_mut()
-        .filter_map(|c| parse_element(c, "provider", strings))
-        .collect();
-    let old_pkg = old_pkg.expect("Apk has no package name???");
-    for provider_attrs in providers {
-        if let Some(value) = get_attribute_value(&provider_attrs, "authorities", strings) {
-            let string = &mut strings[value.data as usize];
-            if let Some(suffix) = string.strip_prefix(&old_pkg) {
-                *string = pkg_name.unwrap().to_owned() + suffix;
-            }
-        }
-    }
+    // Editing resources.arsc is hard
+    edit_attr_in_element(chunks, "application", "label", name.to_owned(), strings)?;
+    edit_attr_in_element(chunks, "activity", "label", name.to_owned(), strings)?;
     // Return modified manifest
     let mut mod_manifest = Vec::new();
     Chunk::Xml(xchunks).write(&mut Cursor::new(&mut mod_manifest))?;
     Ok(mod_manifest)
+}
+fn edit_attr_in_element(
+    elements: &mut [Chunk],
+    el_name: &str,
+    attr_name: &str,
+    new_str: String,
+    pool: &mut Vec<String>,
+) -> Result<Option<String>> {
+    let attrs = elements
+        .iter_mut()
+        .find_map(|e| parse_element(&mut *e, el_name, pool))
+        .with_context(|| format!("Xml element is missing: {el_name}"))?;
+    let attr = attrs
+        .iter_mut()
+        .find(|a| attr_has_name(a.name, attr_name, pool))
+        .with_context(|| format!("Attribute {attr_name} not found in element {el_name}"))?;
+
+    edit_attr_string(attr, new_str, pool)
+}
+fn edit_attr_string(
+    attr: &mut ResXmlAttribute,
+    name: String,
+    pool: &mut Vec<String>,
+) -> Result<Option<String>> {
+    let value = &mut attr.typed_value;
+    let attr_type = ResValueType::from_u8(value.data_type)
+        .with_context(|| format!("Type of label value is unknown: {}", value.data_type))?;
+    match attr_type {
+        ResValueType::String => Ok(Some(mem::replace(&mut pool[value.data as usize], name))),
+        // In this case we overwrite it so that its a direct string, rid solving is pain
+        _ => {
+            let new_rvalue = ResValue {
+                size: 8,
+                res0: 0,
+                data_type: ResValueType::String as u8,
+                data: pool.len() as u32,
+            };
+            *value = new_rvalue;
+            attr.raw_value = pool.len() as i32;
+            pool.push(name);
+            Ok(None)
+        }
+    }
 }
 fn get_attribute_value(attrs: &[ResXmlAttribute], name: &str, pool: &[String]) -> Option<ResValue> {
     attrs
