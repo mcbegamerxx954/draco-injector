@@ -17,6 +17,7 @@ jobs:
         uses: TriPSs/conventional-changelog-action@v5
         with:
           skip-version-file: "true"
+          skip-on-empty: "false"
           skip-commit: "true"
           skip-git-pull: "true"
           github-token: ${{ secrets.github_token }}
