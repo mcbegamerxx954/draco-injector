@@ -1,6 +1,9 @@
 name: Release
 
-on: workflow_dispatch
+on:
+  push:
+    tags:
+      - "*"
 
 jobs:
   make-release:
@@ -14,6 +17,8 @@ jobs:
         uses: TriPSs/conventional-changelog-action@v5
         with:
           skip-version-file: "true"
+          skip-commit: "true"
+          skip-git-pull: "true"
           github-token: ${{ secrets.github_token }}
           output-file: "false"
 
@@ -30,12 +35,18 @@ jobs:
   build:
     strategy:
       matrix:
-        target: 
-          - aarch64-linux-android
-          - armv7-linux-androideabi
-          - x86_64-linux-android
-          - i686-linux-android
-    runs-on: ubuntu-latest
+        include:
+        - target: aarch64-linux-android
+          os: ubuntu-latest
+        - target: armv7-linux-androideabi
+          os: ubuntu-latest
+        - target: x86_64-unknown-linux-gnu
+          os: ubuntu-latest
+        - target: x86_64-apple-darwin
+          os: macos-latest
+        - target: x86_64-pc-windows-msvc
+          os: windows-latest
+    runs-on: ${{matrix.os}}
     permissions:
       contents: write
     steps:
@@ -44,6 +55,7 @@ jobs:
         uses: taiki-e/setup-cross-toolchain-action@v1
         with:
           target: ${{ matrix.target }}
+        if: startsWith(matrix.os, 'ubuntu')
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
           # (required) Comma-separated list of binary names (non-extension portion of filename) to build and upload.
