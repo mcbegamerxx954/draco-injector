@@ -18,18 +18,18 @@ use inquire::{validator::Validation, Confirm};
 use object_rewrite::Rewriter;
 use zip::{read::ZipFile, write::ExtendedFileOptions, ZipArchive, ZipWriter};
 #[derive(Parser)]
-#[clap(name = "Injector", version = "0.0.1")]
+#[clap(name = "Mc injector", version = "0.0.1")]
 #[command(version, about, long_about = None)]
 struct Options {
-    /// Folders/files to work with
+    /// Apk file to patch
     apk: String,
-    /// The new name of the apk
+    /// New app name
     #[arg(short, long, default_value = "Minecraft Patched(whar)")]
     appname: String,
     /// New package name(optional)
     #[arg(short, long)]
     pkgname: Option<String>,
-    /// Where to place the output at
+    /// Output path
     #[arg(short, long)]
     output: String,
 }
@@ -70,7 +70,7 @@ fn rewrite_zip(zip_file: &File, output: &Path, opts: &Options) -> Result<()> {
     }
     if total_size > 0 {
         remove_music = Confirm::new(&format!(
-            "remove vanilla songs to save {} from the final apk?",
+            "Remove vanilla songs to save {} from the final apk?",
             human_bytes(total_size as f64)
         ))
         .prompt()?;
