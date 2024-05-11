@@ -38,6 +38,20 @@ fn main() -> Result<()> {
     let options = Options::command()
         .arg_required_else_help(true)
         .get_matches();
+    let try_it_and_see = inquire::Confirm::new(
+        "Just because the apk can load shaders, it does not \n\
+        mean that the shader you want to use is updated to work \n\
+        on the version the apk is at, do you understand?",
+    )
+    .prompt()?;
+
+    if !try_it_and_see {
+        println!(
+            "{} apk does not matter if your shader is not updated",
+            style("tldr:").red().on_white().bold()
+        );
+    }
+
     let options = Options::from_arg_matches(&options)?;
     let file = File::open(&options.apk)?;
     rewrite_zip(&file, Path::new(&options.output), &options)?;
