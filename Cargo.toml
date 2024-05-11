@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.82"
 apk = "0.4.0"
-clap = { version = "4.5.4", features = ["derive"] }
+clap = { version = "4.5.4", features = ["derive", "color"] }
 console = "0.15.8"
 human_bytes = { version = "0.4.3", default-features = false }
 indicatif = "0.17.8"

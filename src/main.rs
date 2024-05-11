@@ -10,7 +10,13 @@ use apk::{
     res::{Chunk, ResValue, ResValueType, ResXmlAttribute},
     Apk,
 };
-use clap::{CommandFactory, FromArgMatches, Parser};
+use clap::{
+    builder::{
+        styling::{AnsiColor, Style},
+        Styles,
+    },
+    CommandFactory, FromArgMatches, Parser,
+};
 use console::{style, Emoji};
 use human_bytes::human_bytes;
 use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
@@ -19,21 +25,28 @@ use object_rewrite::Rewriter;
 use zip::{read::ZipFile, write::ExtendedFileOptions, ZipArchive, ZipWriter};
 #[derive(Parser)]
 #[clap(name = "Mc injector", version = "0.0.1")]
-#[command(version, about, long_about = None)]
+#[command(version, about, long_about = None, styles = get_style())]
 struct Options {
     /// Apk file to patch
     apk: String,
     /// New app name
-    #[arg(short, long, default_value = "Minecraft Patched(whar)")]
+    #[arg(short, long, default_value = "Minecraft Patched (whar)")]
     appname: String,
-    /// New package name(optional)
+    /// New package name
     #[arg(short, long)]
     pkgname: Option<String>,
     /// Output path
-    #[arg(short, long)]
+    #[arg(short, long, required = true)]
     output: String,
 }
 const MUSIC_PATH: &str = "assets/assets/resource_packs/vanilla_music";
+const fn get_style() -> Styles {
+    Styles::styled()
+        .header(AnsiColor::BrightYellow.on_default())
+        .usage(AnsiColor::Green.on_default())
+        .literal(Style::new().fg_color(None).bold())
+        .placeholder(AnsiColor::Green.on_default())
+}
 fn main() -> Result<()> {
     let options = Options::command()
         .arg_required_else_help(true)
@@ -321,18 +334,18 @@ impl LibraryArch {
     }
     fn rust_target(&self) -> &str {
         match self {
-            LibraryArch::Aarch64 => "aarch64-linux-android",
-            LibraryArch::Armv7a => "armv7-linux-androideabi",
-            LibraryArch::X86 => "i686-linux-android",
-            LibraryArch::X86_64 => "x86_64-linux-android",
+            Self::Aarch64 => "aarch64-linux-android",
+            Self::Armv7a => "armv7-linux-androideabi",
+            Self::X86 => "i686-linux-android",
+            Self::X86_64 => "x86_64-linux-android",
         }
     }
     fn android_abi(&self) -> &str {
         match self {
-            LibraryArch::Aarch64 => "arm64-v8a",
-            LibraryArch::Armv7a => "armeabi-v7a",
-            LibraryArch::X86 => "x86",
-            LibraryArch::X86_64 => "x86_64",
+            Self::Aarch64 => "arm64-v8a",
+            Self::Armv7a => "armeabi-v7a",
+            Self::X86 => "x86",
+            Self::X86_64 => "x86_64",
         }
     }
 }
