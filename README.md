@@ -7,8 +7,7 @@ A tool to inject into any Minecraft render dragon apk the ability to load shader
 ## Usage
 1. Download binary for your platform from [releases](https://github.com/mcbegamerxx954/draco-injector/releases/latest).
 2. Extract the archive.
-<br><br>
-![image](https://github.com/atashi764/draco-injector/assets/40156662/1b7eaf3f-4662-4ffa-98be-4981f49f8911)<br><br>
+![helpoutput](https://github.com/mcbegamerxx954/draco-injector/assets/154642722/1ad5ca88-6c9a-4607-890d-1e4596d539a0)
 3. Run the binary in terminal.
 
 <pre><u style="text-decoration-style:single"><b>Options:</b></u>
