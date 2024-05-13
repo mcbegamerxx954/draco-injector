@@ -30,8 +30,8 @@ struct Options {
     /// Apk file to patch
     apk: String,
     /// New app name
-    #[arg(short, long, default_value = "Minecraft Patched (whar)")]
-    appname: String,
+    #[arg(short, long)]
+    appname: Option<String>,
     /// New package name
     #[arg(short, long)]
     pkgname: Option<String>,
@@ -76,17 +76,8 @@ fn main() -> Result<()> {
 
 fn rewrite_zip(zip_file: &File, output: &Path, opts: &Options) -> Result<()> {
     let mut zip = ZipArchive::new(zip_file)?;
-    let output = File::create_new(output)?;
+    let output = File::create_new(output).with_context(|| "Output file already exists")?;
     let mut outzip = ZipWriter::new(output);
-    println!("{} Patching apk file", Emoji("📦", ""));
-    let pstyle = ProgressStyle::with_template(
-        "{percent:.green.bold}% {msg} [{bar:30.cyan/yellow}] {elapsed}",
-    )?
-    .progress_chars("#- ");
-    let pbar = ProgressBar::new(zip.len().try_into().unwrap())
-        .with_style(pstyle)
-        .with_message("Patching apk")
-        .with_finish(indicatif::ProgressFinish::Abandon);
     let mut total_size = 0;
     let mut remove_music = false;
     for i in 0..zip.len() {
@@ -101,22 +92,36 @@ fn rewrite_zip(zip_file: &File, output: &Path, opts: &Options) -> Result<()> {
             human_bytes(total_size as f64)
         ))
         .prompt()?;
-    }
-    for i in (0..zip.len()).progress_with(pbar.clone()) {
+    }    
+    println!("{} Patching apk file", Emoji("📦", ""));
+    let pstyle = ProgressStyle::with_template(
+        "{percent:.green.bold}% {msg} [{bar:30.cyan/yellow}] {elapsed}",
+    )?
+    .progress_chars("#- ");
+    let pbar = ProgressBar::new(zip.len().try_into().unwrap())
+        .with_style(pstyle)
+        .with_message("Patching apk")
+        .with_finish(indicatif::ProgressFinish::Abandon);
+     for i in (0..zip.len()).progress_with(pbar.clone()) {
         let mut file = zip.by_index(i)?;
         if remove_music && file.name().starts_with(MUSIC_PATH) {
             continue;
         }
         if file.name() == "AndroidManifest.xml" {
+            if opts.appname.is_none() && opts.pkgname.is_none() {
+                pbar.suspend(|| println!("{} Leaving app and package name the same", Emoji("⏩","")));
+                outzip.raw_copy_file(file)?;
+                continue;
+            }
             pbar.suspend(|| println!("{} Editing app and package name", Emoji("📝", "")));
             let mut axml = Vec::new();
             file.read_to_end(&mut axml)?;
-            let axml = edit_manifest(&axml, &opts.appname, opts.pkgname.as_deref())?;
+            let mod_axml = edit_manifest(&axml, opts.appname.as_deref(), opts.pkgname.as_deref())?;
             outzip.start_file(
                 file.name(),
                 zip::write::FileOptions::<ExtendedFileOptions>::default(),
             )?;
-            outzip.write_all(&axml)?;
+            outzip.write_all(&mod_axml)?;
             continue;
         }
         // Boo hoo alignment & compression
@@ -169,7 +174,7 @@ fn patch_minecraft(
     Ok(())
 }
 
-fn edit_manifest(manifest: &[u8], name: &str, pkg_name: Option<&str>) -> Result<Vec<u8>> {
+fn edit_manifest(manifest: &[u8], name: Option<&str>, pkg_name: Option<&str>) -> Result<Vec<u8>> {
     let mut reader = Cursor::new(manifest);
     let Chunk::Xml(mut xchunks) = Chunk::parse(&mut reader)? else {
         anyhow::bail!("invalid manifest 0");
@@ -192,7 +197,7 @@ fn edit_manifest(manifest: &[u8], name: &str, pkg_name: Option<&str>) -> Result<
             .collect();
 
         for provider_attrs in providers {
-            if let Some(value) = get_attribute_value(&provider_attrs, "authorities", strings) {
+            if let Some(value) = get_attribute_value(provider_attrs, "authorities", strings) {
                 let string = &mut strings[value.data as usize];
                 if let Some(suffix) = string.strip_prefix(&old_pkgname) {
                     *string = pkg_name.unwrap().to_owned() + suffix;
@@ -201,8 +206,10 @@ fn edit_manifest(manifest: &[u8], name: &str, pkg_name: Option<&str>) -> Result<
         }
     }
     // Editing resources.arsc is hard
-    edit_attr_in_element(chunks, "application", "label", name.to_owned(), strings)?;
-    edit_attr_in_element(chunks, "activity", "label", name.to_owned(), strings)?;
+    if let Some(app_name) = name {
+        edit_attr_in_element(chunks, "application", "label", app_name.to_owned(), strings)?;
+        edit_attr_in_element(chunks, "activity", "label", app_name.to_owned(), strings)?;
+    }
     // Return modified manifest
     let mut mod_manifest = Vec::new();
     Chunk::Xml(xchunks).write(&mut Cursor::new(&mut mod_manifest))?;
@@ -332,7 +339,7 @@ impl LibraryArch {
             _ => None,
         }
     }
-    fn rust_target(&self) -> &str {
+    const fn rust_target(&self) -> &str {
         match self {
             Self::Aarch64 => "aarch64-linux-android",
             Self::Armv7a => "armv7-linux-androideabi",
@@ -340,7 +347,7 @@ impl LibraryArch {
             Self::X86_64 => "x86_64-linux-android",
         }
     }
-    fn android_abi(&self) -> &str {
+    const fn android_abi(&self) -> &str {
         match self {
             Self::Aarch64 => "arm64-v8a",
             Self::Armv7a => "armeabi-v7a",
