@@ -326,7 +326,7 @@ impl LibraryArch {
     fn from_str(s: &str) -> Option<Self> {
         match s {
             "lib/armeabi-v7a/libminecraftpe.so" => Some(Self::Armv7a),
-            "lib/aarch64/libminecraftpe.so" => Some(Self::Aarch64),
+            "lib/arm64-v8a/libminecraftpe.so" => Some(Self::Aarch64),
             "lib/x86/libminecraftpe.so" => Some(Self::X86),
             "lib/x86_64/libminecraftpe.so" => Some(Self::X86_64),
             _ => None,
