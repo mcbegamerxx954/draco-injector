@@ -4,6 +4,9 @@ Please report any bugs you find in this repo.
 # Draco injector 
 A tool to inject into any Minecraft render dragon apk the ability to load shaders from global resourcepacks (It can't load shader resourcepacks from realms,servers and worlds, but if you add a shader resource pack on global resource packs list the shader you added works on all of those)
 
+> [!NOTE]
+> This injector requires internet connection and utilizes this [repo](https://github.com/mcbegamerxx954/mcbe_shader_redirector).
+
 ## Usage
 1. Download binary for your platform from [releases](https://github.com/mcbegamerxx954/draco-injector/releases/latest).
 2. Extract the archive.
