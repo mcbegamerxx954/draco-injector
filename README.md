@@ -11,6 +11,9 @@ A tool to inject into any Minecraft render dragon apk the ability to load shader
 > [!NOTE]
 > This injector requires internet connection and utilizes this [repo](https://github.com/mcbegamerxx954/mcbe_shader_redirector).
 
+> [!About 1.20.80+ shader support]
+> According to this [reply](https://github.com/mcbegamerxx954/draco-injector/issues/1#issuecomment-2136571773) shaders still work just need small change.
+
 ## Usage
 1. Download binary for your platform from [releases](https://github.com/mcbegamerxx954/draco-injector/releases/latest).
 2. Extract the archive.
