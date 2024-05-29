@@ -3,7 +3,7 @@ Please report any bugs you find in this repo.
 
 ## Known Bugs
 - Crashes on some devices
-- On android 10 or less using external storage makes it unreliable / not work
+- Might need you to get out and then back into minecraft while in a world for shaders to work
   
 # Draco injector 
 A tool to inject into any Minecraft render dragon apk the ability to load shaders from global resourcepacks (It can't load shader resourcepacks from realms,servers and worlds, but if you add a shader resource pack on global resource packs list the shader you added works on all of those)
@@ -11,7 +11,8 @@ A tool to inject into any Minecraft render dragon apk the ability to load shader
 > [!NOTE]
 > This injector requires internet connection and utilizes this [repo](https://github.com/mcbegamerxx954/mcbe_shader_redirector).
 
-> [!About 1.20.80+ shader support]
+> [!NOTE]
+> #### About 1.20.80+ shader support
 > According to this [reply](https://github.com/mcbegamerxx954/draco-injector/issues/1#issuecomment-2136571773) shaders still work just need small change.
 
 ## Usage
