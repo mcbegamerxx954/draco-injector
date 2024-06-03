@@ -1,8 +1,8 @@
 use std::{
     fs::{self, File},
-    io::{Cursor, Read, Write},
+    io::{BufReader, BufWriter, Cursor, Read, Write},
     mem,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result};
@@ -18,7 +18,6 @@ use clap::{
     CommandFactory, FromArgMatches, Parser,
 };
 use console::{style, Emoji};
-use human_bytes::human_bytes;
 use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use inquire::{validator::Validation, Confirm};
 use object_rewrite::Rewriter;
@@ -28,16 +27,20 @@ use zip::{read::ZipFile, write::ExtendedFileOptions, ZipArchive, ZipWriter};
 #[command(version, about, long_about = None, styles = get_style())]
 struct Options {
     /// Apk file to patch
-    apk: String,
+    #[clap(required = true)]
+    apk: PathBuf,
     /// New app name
     #[arg(short, long)]
     appname: Option<String>,
-    /// New package name
+    /// New package id
     #[arg(short, long)]
-    pkgname: Option<String>,
+    pkgid: Option<String>,
+    /// Remove songs from final apk
+    #[arg(short, long)]
+    remove_songs: bool,
     /// Output path
     #[arg(short, long, required = true)]
-    output: String,
+    output: PathBuf,
 }
 const MUSIC_PATH: &str = "assets/assets/resource_packs/vanilla_music";
 const fn get_style() -> Styles {
@@ -48,51 +51,23 @@ const fn get_style() -> Styles {
         .placeholder(AnsiColor::Green.on_default())
 }
 fn main() -> Result<()> {
-    let options = Options::command()
-        .arg_required_else_help(true)
-        .get_matches();
-    let try_it_and_see = inquire::Confirm::new(
-        "Just because the apk can load shaders, it does not \n\
-        mean that the shader you want to use is updated to work \n\
-        on the version the apk is at, do you understand?",
-    )
-    .prompt()?;
-
-    if !try_it_and_see {
-        println!(
-            "{} apk does not matter if your shader is not updated",
-            style("tldr:").red().on_white().bold()
-        );
-    }
-
-    let options = Options::from_arg_matches(&options)?;
+    let options = Options::parse();
     let file = File::open(&options.apk)?;
-    rewrite_zip(&file, Path::new(&options.output), &options)?;
+    rewrite_zip(&file, &options.output, &options)?;
     println!("{} Signing patched apk", Emoji("🖋️", ""));
-    Apk::sign(Path::new(&options.output), None)?;
+    Apk::sign(&options.output, None)?;
     println!("{}", style("Done!").green().bold());
     Ok(())
 }
 
 fn rewrite_zip(zip_file: &File, output: &Path, opts: &Options) -> Result<()> {
-    let mut zip = ZipArchive::new(zip_file)?;
+    let mut zip = ZipArchive::new(BufReader::new(zip_file))?;
     let output = File::create_new(output).with_context(|| "Output file already exists")?;
-    let mut outzip = ZipWriter::new(output);
-    let mut total_size = 0;
-    let mut remove_music = false;
-    for i in 0..zip.len() {
-        let file = zip.by_index(i)?;
-        if file.name().starts_with(MUSIC_PATH) {
-            total_size += file.compressed_size();
-        }
-    }
-    if total_size > 0 {
-        remove_music = Confirm::new(&format!(
-            "Remove vanilla songs to save {} from the final apk?",
-            human_bytes(total_size as f64)
-        ))
-        .prompt()?;
-    }    
+    let mut outzip = ZipWriter::new(BufWriter::new(output));
+    println!(
+        "{}: Make sure you use shaders for the version of apk you are patching",
+        style("TIP").green()
+    );
     println!("{} Patching apk file", Emoji("📦", ""));
     let pstyle = ProgressStyle::with_template(
         "{percent:.green.bold}% {msg} [{bar:30.cyan/yellow}] {elapsed}",
@@ -102,21 +77,24 @@ fn rewrite_zip(zip_file: &File, output: &Path, opts: &Options) -> Result<()> {
         .with_style(pstyle)
         .with_message("Patching apk")
         .with_finish(indicatif::ProgressFinish::Abandon);
-     for i in (0..zip.len()).progress_with(pbar.clone()) {
+    pbar.enable_steady_tick(std::time::Duration::from_millis(250));
+    for i in (0..zip.len()).progress_with(pbar.clone()) {
         let mut file = zip.by_index(i)?;
-        if remove_music && file.name().starts_with(MUSIC_PATH) {
+        if skip_filename(file.name(), opts.remove_songs) {
             continue;
         }
         if file.name() == "AndroidManifest.xml" {
-            if opts.appname.is_none() && opts.pkgname.is_none() {
-                pbar.suspend(|| println!("{} Leaving app and package name the same", Emoji("⏩","")));
+            if opts.appname.is_none() && opts.pkgid.is_none() {
+                pbar.suspend(|| {
+                    println!("{} Leaving app and package name the same", Emoji("⏩", ""))
+                });
                 outzip.raw_copy_file(file)?;
                 continue;
             }
             pbar.suspend(|| println!("{} Editing app and package name", Emoji("📝", "")));
             let mut axml = Vec::new();
             file.read_to_end(&mut axml)?;
-            let mod_axml = edit_manifest(&axml, opts.appname.as_deref(), opts.pkgname.as_deref())?;
+            let mod_axml = edit_manifest(&axml, opts.appname.as_deref(), opts.pkgid.as_deref())?;
             outzip.start_file(
                 file.name(),
                 zip::write::FileOptions::<ExtendedFileOptions>::default(),
@@ -152,9 +130,17 @@ fn rewrite_zip(zip_file: &File, output: &Path, opts: &Options) -> Result<()> {
     outzip.finish()?;
     Ok(())
 }
+fn skip_filename(filename: &str, no_songs: bool) -> bool {
+    (no_songs && filename.starts_with(MUSIC_PATH)) ||
+    // Broken ignature v1 can cause issues
+    filename.starts_with("META-INF/") && 
+    (filename.ends_with(".SF") || filename.ends_with("RSA")) || 
+    // Skip this lib so the patcher can update already patched apps
+    filename.ends_with("libdraco_redirector.so")
+}
 fn patch_minecraft(
     lib: &mut ZipFile,
-    zip: &mut ZipWriter<File>,
+    zip: &mut ZipWriter<BufWriter<File>>,
     libarch: LibraryArch,
 ) -> Result<()> {
     let libpatcher = get_draco_patch(libarch)?;
