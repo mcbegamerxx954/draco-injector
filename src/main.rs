@@ -68,6 +68,7 @@ fn rewrite_zip(zip_file: &File, output: &Path, opts: &Options) -> Result<()> {
         "{}: Make sure you use shaders for the version of apk you are patching",
         style("TIP").green()
     );
+    std::thread::sleep(std::time::Duration::from_secs(2));
     println!("{} Patching apk file", Emoji("📦", ""));
     let pstyle = ProgressStyle::with_template(
         "{percent:.green.bold}% {msg} [{bar:30.cyan/yellow}] {elapsed}",
