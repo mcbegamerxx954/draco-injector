@@ -13,6 +13,7 @@ console = "0.15.8"
 human_bytes = { version = "0.4.3", default-features = false }
 indicatif = "0.17.8"
 inquire = { version = "0.7.5", default-features = false, features = ["console", "macros", "one-liners"] }
+
 object-rewrite = "0.1.1"
 thiserror = "1.0.59"
 ureq = "2.9.6"
